@@ -1,0 +1,44 @@
+diff --git a/src/CsvFileObject.php b/src/CsvFileObject.php
+index 437e40c..ff963ba 100644
+--- a/src/CsvFileObject.php
++++ b/src/CsvFileObject.php
+@@ -45,7 +45,9 @@ class CsvFileObject extends \SplFileObject {
+    */
+   public function __construct($file_name, $has_header = FALSE, array $header_mapping = []) {
+     parent::__construct($file_name);
+-
++    // SplFileObject::setCsvControl set delimiter.
++    // From public function setCsvControl ($delimiter = ",", $enclosure = "\"", $escape = "\\").
++    $this->setCsvControl(';', '"', "\\");
+     $this->setFlags(self::READ_CSV | self::READ_AHEAD | self::DROP_NEW_LINE | self::SKIP_EMPTY);
+     $this->hasHeader = $has_header;
+     $this->headerMapping = $header_mapping;
+diff --git a/src/Form/PriceListItemImportForm.php b/src/Form/PriceListItemImportForm.php
+index ae54da9..4dcc6bf 100644
+--- a/src/Form/PriceListItemImportForm.php
++++ b/src/Form/PriceListItemImportForm.php
+@@ -289,6 +289,7 @@ class PriceListItemImportForm extends FormBase {
+     /** @var \Drupal\commerce_pricelist\Entity\PriceList $price_list */
+     $price_list = $price_list_storage->load($price_list_id);
+     $purchasable_entity_storage = $entity_type_manager->getStorage($price_list->bundle());
++    ini_set("auto_detect_line_endings", true);
+     $csv = new CsvFileObject($file_uri, TRUE, [
+       $mapping['purchasable_entity_column'] => 'purchasable_entity',
+       $mapping['quantity_column'] => 'quantity',
+@@ -328,6 +329,16 @@ class PriceListItemImportForm extends FormBase {
+         }
+       }
+
++      if (strpos($row['price'], ' ')) {
++        $row['price'] = str_replace(' ', '', $row['price']);
++      }
++
++      foreach (['quantity', 'list_price'] as $extra_column) {
++        if (empty($row[$extra_column])) {
++          $row[$extra_column] = 0;
++        }
++      }
++
+       $purchasable_entity = $purchasable_entity_storage->loadByProperties([
+         $mapping['purchasable_entity_column_type'] => $row['purchasable_entity'],
+       ]);

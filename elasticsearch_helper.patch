@@ -1,0 +1,15 @@
+diff --git a/elasticsearch_helper.module b/elasticsearch_helper.module
+index 8675cfb..8ac3713 100644
+--- a/elasticsearch_helper.module
++++ b/elasticsearch_helper.module
+@@ -11,6 +11,10 @@ use Drupal\Core\Entity\EntityInterface;
+  * Implements hook_entity_insert().
+  */
+ function elasticsearch_helper_entity_insert(EntityInterface $entity) {
++  // Quick hack to avoid queuing of everything.
++  if (!in_array($entity->getEntityTypeId(), ['node', 'commerce_product'])) {
++    return;
++  }
+   $config = \Drupal::config('elasticsearch_helper.settings');
+   if ($config->get('elasticsearch_helper.defer_indexing')) {
+     \Drupal::queue('elasticsearch_helper_indexing')
