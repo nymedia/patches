@@ -1,0 +1,67 @@
+diff --git a/modules/entity_share_client/src/Service/JsonapiHelper.php b/modules/entity_share_client/src/Service/JsonapiHelper.php
+index a7a2c64..bfebc22 100644
+--- a/modules/entity_share_client/src/Service/JsonapiHelper.php
++++ b/modules/entity_share_client/src/Service/JsonapiHelper.php
+@@ -238,31 +238,40 @@ class JsonapiHelper implements JsonapiHelperInterface {
+             $referenced_entities_json = Json::decode($referenced_entities_response);
+ 
+             if (!isset($referenced_entities_json['errors'])) {
+-              $referenced_entities_ids = $this->importEntityListData($referenced_entities_json['data']);
+-
+-              $main_property = $field->getItemDefinition()->getMainPropertyName();
+-
+-              // Add field metadatas.
+-              foreach ($this->prepareData($field_data['data']) as $key => $field_value_data) {
+-                // When dealing with taxonomy term entities which has a
+-                // hierarchy, there is a virtual entity for the root. So
+-                // $referenced_entities_ids[$key] may not exist.
+-                // See https://www.drupal.org/node/2976856.
+-                if (isset($referenced_entities_ids[$key])) {
+-                  $field_value = [
+-                    $main_property => $referenced_entities_ids[$key],
+-                  ];
+-
+-                  if (isset($field_value_data['meta'])) {
+-                    $field_value += $field_value_data['meta'];
++              if (is_array($referenced_entities_json['data'])) {
++                $referenced_entities_ids = $this->importEntityListData($referenced_entities_json['data']);
++
++                $main_property = $field->getItemDefinition()
++                  ->getMainPropertyName();
++
++                // Add field metadatas.
++                foreach ($this->prepareData($field_data['data']) as $key => $field_value_data) {
++                  // When dealing with taxonomy term entities which has a
++                  // hierarchy, there is a virtual entity for the root. So
++                  // $referenced_entities_ids[$key] may not exist.
++                  // See https://www.drupal.org/node/2976856.
++                  if (isset($referenced_entities_ids[$key])) {
++                    $field_value = [
++                      $main_property => $referenced_entities_ids[$key],
++                    ];
++
++                    if (isset($field_value_data['meta'])) {
++                      $field_value += $field_value_data['meta'];
++                    }
++
++                    // Allow to alter the field value with an event.
++                    $event = new RelationshipFieldValueEvent($field, $field_value);
++                    $this->eventDispatcher->dispatch(RelationshipFieldValueEvent::EVENT_NAME, $event);
++                    $field_values[] = $event->getFieldValue();
+                   }
+-
+-                  // Allow to alter the field value with an event.
+-                  $event = new RelationshipFieldValueEvent($field, $field_value);
+-                  $this->eventDispatcher->dispatch(RelationshipFieldValueEvent::EVENT_NAME, $event);
+-                  $field_values[] = $event->getFieldValue();
+                 }
+               }
++              else {
++                $context = [
++                  'entity' => json_encode($entity->toArray(), JSON_PRETTY_PRINT),
++                ];
++                \Drupal::logger('entity_share_client')->error('Data is not an array', $context);
++              }
+             }
+           }
+           $entity->set($field_name, $field_values);
