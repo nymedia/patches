@@ -1,0 +1,13 @@
+diff --git a/core/includes/install.inc b/core/includes/install.inc
+index ce7df4759e..24e6a0eeaa 100644
+--- a/core/includes/install.inc
++++ b/core/includes/install.inc
+@@ -255,7 +255,7 @@ function drupal_get_database_types() {
+  */
+ function drupal_rewrite_settings($settings = [], $settings_file = NULL) {
+   if (!isset($settings_file)) {
+-    $settings_file = \Drupal::getContainer()->getParameter('site.path') . '/settings.php';
++    $settings_file = \Drupal::service('site.path') . '/settings.local.php';
+   }
+   // Build list of setting names and insert the values into the global namespace.
+   $variable_names = [];
