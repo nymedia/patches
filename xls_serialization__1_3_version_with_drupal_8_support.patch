@@ -105,41 +105,6 @@ index 6a2567d..8d6187e 100644
      return $format === static::$format;
    }
 
-diff --git a/src/EventSubscriber/Subscriber.php b/src/EventSubscriber/Subscriber.php
-index ef61c17..84be0b1 100644
---- a/src/EventSubscriber/Subscriber.php
-+++ b/src/EventSubscriber/Subscriber.php
-@@ -3,7 +3,7 @@
- namespace Drupal\xls_serialization\EventSubscriber;
-
- use Symfony\Component\EventDispatcher\EventSubscriberInterface;
--use Symfony\Component\HttpKernel\Event\GetResponseEvent;
-+use Symfony\Component\HttpKernel\Event\RequestEvent;
- use Symfony\Component\HttpKernel\KernelEvents;
-
- /**
-@@ -14,7 +14,7 @@ class Subscriber implements EventSubscriberInterface {
-   /**
-    * {@inheritdoc}
-    */
--  public static function getSubscribedEvents() {
-+  public static function getSubscribedEvents():array {
-     $events[KernelEvents::REQUEST][] = ['onKernelRequest'];
-     return $events;
-   }
-@@ -22,10 +22,10 @@ class Subscriber implements EventSubscriberInterface {
-   /**
-    * Register content formats on the request object.
-    *
--   * @param Symfony\Component\HttpKernel\Event\GetResponseEvent $event
-+   * @param Symfony\Component\HttpKernel\Event\RequestEvent $event
-    *   The event to get the request object to register on.
-    */
--  public function onKernelRequest(GetResponseEvent $event) {
-+  public function onKernelRequest(RequestEvent $event) {
-     $event->getRequest()->setFormat('xls', ['application/vnd.ms-excel']);
-     $event->getRequest()->setFormat('xlsx', ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
-   }
 diff --git a/src/Plugin/views/style/ExcelExport.php b/src/Plugin/views/style/ExcelExport.php
 index fa10cb4..61cac7a 100644
 --- a/src/Plugin/views/style/ExcelExport.php
@@ -162,28 +127,6 @@ index fa10cb4..61cac7a 100644
      $url_options = [];
      $input = $this->view->getExposedInput();
      if ($input) {
-diff --git a/tests/src/Unit/EventSubscriber/SubscriberTest.php b/tests/src/Unit/EventSubscriber/SubscriberTest.php
-index 8d9e022..7438a0a 100644
---- a/tests/src/Unit/EventSubscriber/SubscriberTest.php
-+++ b/tests/src/Unit/EventSubscriber/SubscriberTest.php
-@@ -5,7 +5,7 @@ namespace Drupal\Tests\xls_serialization\Unit\EventSubscriber;
- use Drupal\Tests\UnitTestCase;
- use Drupal\xls_serialization\EventSubscriber\Subscriber;
- use Symfony\Component\HttpFoundation\Request;
--use Symfony\Component\HttpKernel\Event\GetResponseEvent;
-+use Symfony\Component\HttpKernel\Event\RequestEvent;
-
- /**
-  * Tests the XLS serialization event subscriber.
-@@ -24,7 +24,7 @@ class SubscriberTest extends UnitTestCase {
-     $request = $this->prophesize(Request::class);
-     $request->setFormat('xls', ['application/vnd.ms-excel'])->shouldBeCalled();
-     $request->setFormat('xlsx', ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])->shouldBeCalled();
--    $event = $this->prophesize(GetResponseEvent::class);
-+    $event = $this->prophesize(RequestEvent::class);
-     $event->getRequest()->willReturn($request->reveal());
-     $subscriber = new Subscriber();
-     $subscriber->onKernelRequest($event->reveal());
 diff --git a/xls_serialization.info.yml b/xls_serialization.info.yml
 index c86f6f9..1a6a986 100644
 --- a/xls_serialization.info.yml
