@@ -1,0 +1,171 @@
+diff --git a/README.md b/README.md
+index 59e5e8c..395604d 100644
+--- a/README.md
++++ b/README.md
+@@ -3,7 +3,7 @@
+ [![<wunderio>](https://circleci.com/gh/wunderio/elasticsearch_helper/tree/7.x.svg?style=svg)](<https://app.circleci.com/pipelines/github/wunderio/elasticsearch_helper?branch=8.x-7.x>)
+ 
+ ## System requirements
+-* Drupal ^9.4
++* Drupal ^9 || ^10 || ^11
+ * [Elasticsearch-PHP](https://github.com/elastic/elasticsearch-php) library
+ 
+ ## Installation
+diff --git a/elasticsearch_helper.info.yml b/elasticsearch_helper.info.yml
+index 2980a98..31fd731 100644
+--- a/elasticsearch_helper.info.yml
++++ b/elasticsearch_helper.info.yml
+@@ -1,7 +1,7 @@
+ name: Elasticsearch Helper
+ type: module
+ description: Provides tools to integrate Elasticsearch with Drupal.
+-core_version_requirement: ^9.4 || ^10
++core_version_requirement: ^9 || ^10 || ^11
+ package: Elasticsearch Helper
+ configure: elasticsearch_helper.elasticsearch_helper_settings_form
+ dependencies:
+diff --git a/elasticsearch_helper.services.yml b/elasticsearch_helper.services.yml
+index a9cb4f1..8c5c58b 100644
+--- a/elasticsearch_helper.services.yml
++++ b/elasticsearch_helper.services.yml
+@@ -43,7 +43,7 @@ services:
+     class: Drupal\elasticsearch_helper\ElasticsearchHelperQueueFactoryDecorator
+     public: false
+     decorates: queue
+-    arguments: ['@elasticsearch_helper.queue_factory_decorator.inner', '@settings']
++    arguments: ['@elasticsearch_helper.queue_factory_decorator.inner', '@elasticsearch_helper.queue_factory']
+     decoration_priority: 3
+ 
+   plugin.manager.elasticsearch_auth:
+diff --git a/examples/elasticsearch_helper_example/elasticsearch_helper_example.info.yml b/examples/elasticsearch_helper_example/elasticsearch_helper_example.info.yml
+index 2a409f9..e813a46 100644
+--- a/examples/elasticsearch_helper_example/elasticsearch_helper_example.info.yml
++++ b/examples/elasticsearch_helper_example/elasticsearch_helper_example.info.yml
+@@ -1,7 +1,7 @@
+ name: Elasticsearch Helper Example
+ type: module
+ description: Example plugin implementation for the Elasticsearch Helper module.
+-core_version_requirement: ^9.4 || ^10
++core_version_requirement: ^9 || ^10 || ^11
+ hidden: true
+ package: Elasticsearch Helper
+ dependencies:
+diff --git a/src/ElasticsearchHelperQueueFactoryDecorator.php b/src/ElasticsearchHelperQueueFactoryDecorator.php
+index 1c3b619..6c484b0 100644
+--- a/src/ElasticsearchHelperQueueFactoryDecorator.php
++++ b/src/ElasticsearchHelperQueueFactoryDecorator.php
+@@ -3,8 +3,6 @@
+ namespace Drupal\elasticsearch_helper;
+ 
+ use Drupal\Core\Queue\QueueFactory;
+-use Drupal\Core\Site\Settings;
+-use Symfony\Component\DependencyInjection\ContainerAwareInterface;
+ 
+ /**
+  * QueueFactory decorator.
+@@ -12,7 +10,7 @@ use Symfony\Component\DependencyInjection\ContainerAwareInterface;
+  * Decorates the core QueueFactory to modify get() method
+  * and return a custom Queue for Elasticsearch Helper.
+  */
+-class ElasticsearchHelperQueueFactoryDecorator extends QueueFactory implements ContainerAwareInterface {
++class ElasticsearchHelperQueueFactoryDecorator extends QueueFactory {
+ 
+   /**
+    * The inner queue service.
+@@ -22,15 +20,18 @@ class ElasticsearchHelperQueueFactoryDecorator extends QueueFactory implements C
+   protected $innerService;
+ 
+   /**
+-   * ElasticsearchHelperQueueFactoryDecorator constructor.
++   * The queue factory.
+    *
+-   * @param \Drupal\Core\Queue\QueueFactory $inner
+-   * @param \Drupal\Core\Site\Settings $settings
++   * @var \Drupal\elasticsearch_helper\ElasticsearchHelperQueueFactory
+    */
+-  public function __construct(QueueFactory $inner, Settings $settings) {
+-    parent::__construct($settings);
++  protected $queueFactory;
+ 
++  /**
++   * ElasticsearchHelperQueueFactoryDecorator constructor.
++   */
++  public function __construct(QueueFactory $inner, ElasticsearchHelperQueueFactory $queue_factory) {
+     $this->innerService = $inner;
++    $this->queueFactory = $queue_factory;
+   }
+ 
+   /**
+@@ -40,7 +41,7 @@ class ElasticsearchHelperQueueFactoryDecorator extends QueueFactory implements C
+     // Use module's own queue implementation.
+     if ($name == 'elasticsearch_helper_indexing') {
+       if (!isset($this->queues[$name])) {
+-        $queue = $this->innerService->container->get('elasticsearch_helper.queue_factory')->get($name);
++        $queue = $this->queueFactory->get($name);
+         $this->queues[$name] = $queue;
+       }
+ 
+diff --git a/src/Form/ElasticsearchHelperSettingsForm.php b/src/Form/ElasticsearchHelperSettingsForm.php
+index a2912cb..8b7b254 100644
+--- a/src/Form/ElasticsearchHelperSettingsForm.php
++++ b/src/Form/ElasticsearchHelperSettingsForm.php
+@@ -3,12 +3,10 @@
+ namespace Drupal\elasticsearch_helper\Form;
+ 
+ use Drupal\Component\Utility\NestedArray;
+-use Drupal\Core\Config\ConfigFactoryInterface;
+ use Drupal\Core\Form\ConfigFormBase;
+ use Drupal\Core\Form\FormStateInterface;
+ use Drupal\Core\Form\SubformState;
+ use Drupal\elasticsearch_helper\ElasticsearchConnectionSettings;
+-use Elasticsearch\Client;
+ use Elasticsearch\Common\Exceptions\NoNodesAvailableException;
+ use Symfony\Component\DependencyInjection\ContainerInterface;
+ 
+@@ -31,29 +29,14 @@ class ElasticsearchHelperSettingsForm extends ConfigFormBase {
+    */
+   protected $config;
+ 
+-  /**
+-   * ElasticsearchHelperSettingsForm constructor.
+-   *
+-   * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
+-   *   The factory for configuration objects.
+-   * @param \Elasticsearch\Client $elasticsearch_client
+-   *   The Elasticsearch client.
+-   */
+-  public function __construct(ConfigFactoryInterface $config_factory, Client $elasticsearch_client) {
+-    parent::__construct($config_factory);
+-
+-    $this->client = $elasticsearch_client;
+-    $this->config = $this->config('elasticsearch_helper.settings');
+-  }
+-
+   /**
+    * {@inheritdoc}
+    */
+   public static function create(ContainerInterface $container) {
+-    return new static(
+-      $container->get('config.factory'),
+-      $container->get('elasticsearch_helper.elasticsearch_client')
+-    );
++    $instance = parent::create($container);
++    $instance->client = $container->get('elasticsearch_helper.elasticsearch_client');
++    $instance->config = $instance->config('elasticsearch_helper.settings');
++    return $instance;
+   }
+ 
+   /**
+diff --git a/tests/modules/elasticsearch_helper_test/elasticsearch_helper_test.info.yml b/tests/modules/elasticsearch_helper_test/elasticsearch_helper_test.info.yml
+index 71f282c..b26f6ce 100644
+--- a/tests/modules/elasticsearch_helper_test/elasticsearch_helper_test.info.yml
++++ b/tests/modules/elasticsearch_helper_test/elasticsearch_helper_test.info.yml
+@@ -1,7 +1,7 @@
+ name: Elasticsearch Helper Test Module
+ type: module
+ description: Plugin implementation for the Elasticsearch Helper module tests.
+-core_version_requirement: ^9.4 || ^10
++core_version_requirement: ^9 || ^10 || ^11
+ hidden: true
+ dependencies:
+   - drupal:elasticsearch_helper
