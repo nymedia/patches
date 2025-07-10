@@ -1,5 +1,5 @@
 diff --git a/entity_reference_revisions.views.inc b/entity_reference_revisions.views.inc
-index 6dd8ec6..28e0db5 100644
+index 6dd8ec6..8bee7a0 100644
 --- a/entity_reference_revisions.views.inc
 +++ b/entity_reference_revisions.views.inc
 @@ -5,68 +5,216 @@
@@ -465,8 +465,8 @@ index 0000000..eaa55f7
 +            offset: false
 +            offset_label: Offset
 +          tags:
-+            previous: â€¹â€¹
-+            next: â€ºâ€º
++            previous: ‹‹
++            next: ››
 +      style:
 +        type: table
 +      row:
